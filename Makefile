@@ -11,9 +11,23 @@ SLANG_BUILD_DIR ?= $(SLANG_SOURCE_DIR)/build
 OPTIX_ROOT ?= $(CURDIR)/external/optix-dev
 DNF ?= sudo dnf
 INSTALL ?= install
+DOCKER ?= docker
+CUDA_ARTIFACTS_DOCKERFILE ?= packaging/docker/cuda-artifacts.Dockerfile
+CUDA_ARTIFACTS_IMAGE ?= shrimply-cuda-artifacts
+CUDA_ARTIFACTS_CONTAINER ?= shrimply-cuda-artifacts-run
+CUDA_ARTIFACTS_PREBUILT_DIR ?= crates/render-cuda/prebuilt/$(CUDA_TARGET)
+FLATPAK ?= flatpak
+FLATPAK_BUILDER ?= flatpak-builder
+FLATPAK_RUNTIME_VERSION ?= 50
+FLATPAK_MANIFEST ?= packaging/flatpak/dev.shrimply.Shrimply.yaml
+FLATPAK_BUILD_DIR ?= build
+# org.gnome.Sdk//50's base; the Sdk extensions have no "50" branch of their own.
+FLATPAK_SDK_EXTENSION_BRANCH ?= 25.08
 PKG_CONFIG ?= /usr/bin/pkg-config
 PKG_CONFIG_PATH ?= /usr/lib64/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
 QT_QMAKE ?= qmake6
+APPSTREAMCLI ?= appstreamcli
+DESKTOP_FILE_VALIDATE ?= desktop-file-validate
 SLANG_LIBRARY_ENV = LD_LIBRARY_PATH="$(SLANG_BUILD_DIR)/Release/lib:$${LD_LIBRARY_PATH}" DYLD_LIBRARY_PATH="$(SLANG_BUILD_DIR)/Release/lib:$${DYLD_LIBRARY_PATH}"
 BUILD_ENV := CUDA_HOME=$(CUDA_HOME) CUDA_TOOLKIT_PATH=$(CUDA_TOOLKIT_PATH) PATH=$(CUDA_HOME)/bin:$(PATH) PKG_CONFIG=$(PKG_CONFIG) PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) SLANG_SOURCE_DIR=$(SLANG_SOURCE_DIR) SLANG_BUILD_DIR=$(SLANG_BUILD_DIR) OPTIX_ROOT=$(OPTIX_ROOT)
 BUILD_ENV += $(SLANG_LIBRARY_ENV)
@@ -73,7 +87,7 @@ APPKIT_ICON_SIZE := 512
 RSVG_CONVERT ?= rsvg-convert
 LIP_SYNC_MODEL := target/release/res/lip-sync/pocketsphinx-ci.model
 LIP_SYNC_RESOURCE_DIR := $(DATADIR)/shrimply/lip-sync
-LIP_SYNC_LICENSE_DIR := $(DATADIR)/licenses/shrimply
+LICENSE_DIR := $(DATADIR)/licenses/shrimply
 ICONS_RESOURCE_DIR := $(DATADIR)/shrimply/icons
 
 FEDORA_PACKAGES := \
@@ -103,7 +117,7 @@ FEDORA_PACKAGES := \
 	qt6-qtbase-devel \
 	qt6-qtdeclarative-devel
 
-.PHONY: native-deps qt-native-deps desktop-icon qt-desktop-file cuda-target-check cuda-artifacts dev dev-mac qt-build dev-qt dev-server docs docs-check run run-qt build release check components-check gtk-components-showcase qt-components-showcase server-python-check manim manim-python-check manim-parameter-check cargo-check fmt fmt-check lint test frame-rate-test video-lifecycle-test transparent-fill-frame-range-test transparent-fill-decoder-test transparent-fill-kernel-test transparent-fill-compositor-test transparent-fill-playback-test transparent-fill-e2e-fixture transparent-fill-e2e-test decode-ahead-benchmark paint-interpolation-test crash-report clean-dev clean deps-fedora deps-fedora-qt qt-release install install-qt install-codex-mcp-dev install-agy-mcp-dev uninstall uninstall-qt dist-image dist
+.PHONY: native-deps qt-native-deps desktop-icon qt-desktop-file cuda-target-check cuda-artifacts cuda-artifacts-image flatpak-sdk flatpak-submodules flatpak-cuda-vendor flatpak-skeleton flatpak-bootstrap flatpak-rust-sdk flatpak-llvm-sdk flatpak-rust-check dev dev-mac qt-build dev-qt dev-server docs docs-check run run-qt build release check components-check gtk-components-showcase qt-components-showcase server-python-check manim manim-python-check manim-parameter-check metainfo-check desktop-file-check cargo-check fmt fmt-check lint test frame-rate-test video-lifecycle-test transparent-fill-frame-range-test transparent-fill-decoder-test transparent-fill-kernel-test transparent-fill-compositor-test transparent-fill-playback-test transparent-fill-e2e-fixture transparent-fill-e2e-test decode-ahead-benchmark paint-interpolation-test crash-report clean-dev clean deps-fedora deps-fedora-qt qt-release install install-qt install-codex-mcp-dev install-agy-mcp-dev uninstall uninstall-qt dist
 native-deps:
 	@$(PKG_CONFIG) --exists rubberband || { echo "Missing Rubber Band development files (pkg-config: rubberband)" >&2; exit 1; }
 	@$(PKG_CONFIG) --exists libpipewire-0.3 || { echo "Missing PipeWire development files (pkg-config: libpipewire-0.3)" >&2; exit 1; }
@@ -130,6 +144,89 @@ cuda-target-check:
 
 cuda-artifacts: cuda-target-check slang-compiler
 	$(BUILD_ENV) CUDA_TARGET=$(CUDA_TARGET) CUDA_HOST_CXX=$(CUDA_HOST_CXX) $(CARGO) build -p shrimply-render-cuda
+
+# Builds the prebuilt .cubin files vendored for the flatpak sandbox (where nvcc
+# never runs) by running `make cuda-artifacts` in a Docker image that has nvcc,
+# then copying the cubins to $(CUDA_ARTIFACTS_PREBUILT_DIR)/ where build.rs
+# picks them up. Heavy and explicit-only -- not a dependency of check/dev.
+cuda-artifacts-image:
+	@command -v $(DOCKER) >/dev/null 2>&1 || { echo "Installing docker..."; $(PACMAN) -S --noconfirm docker; sudo systemctl enable --now docker; }
+	$(DOCKER) build -f $(CUDA_ARTIFACTS_DOCKERFILE) -t $(CUDA_ARTIFACTS_IMAGE) .
+	-$(DOCKER) rm -f $(CUDA_ARTIFACTS_CONTAINER) >/dev/null 2>&1
+	$(DOCKER) run --name $(CUDA_ARTIFACTS_CONTAINER) $(CUDA_ARTIFACTS_IMAGE)
+	mkdir -p $(CUDA_ARTIFACTS_PREBUILT_DIR)
+	$(DOCKER) cp $(CUDA_ARTIFACTS_CONTAINER):/src/.slang-artifacts/cuda/$(CUDA_TARGET)/. $(CUDA_ARTIFACTS_PREBUILT_DIR)/
+	find $(CUDA_ARTIFACTS_PREBUILT_DIR) -maxdepth 1 -type f ! -name '*.cubin' -delete
+	-chown -R "$$(id -u):$$(id -g)" $(CUDA_ARTIFACTS_PREBUILT_DIR) 2>/dev/null
+	$(DOCKER) rm -f $(CUDA_ARTIFACTS_CONTAINER) >/dev/null 2>&1
+
+# Idempotent installs of flatpak, flatpak-builder, the flathub remote and the
+# org.gnome Platform/Sdk pair. Package names assume pacman (the target machine
+# is Arch, per CLAUDE.md) -- override PACMAN otherwise.
+PACMAN ?= sudo pacman
+flatpak-sdk:
+	@command -v $(FLATPAK) >/dev/null 2>&1 || { echo "Installing flatpak..."; $(PACMAN) -S --noconfirm flatpak; }
+	@command -v $(FLATPAK_BUILDER) >/dev/null 2>&1 || { echo "Installing flatpak-builder..."; $(PACMAN) -S --noconfirm flatpak-builder; }
+	@$(FLATPAK) remote-list | grep -q '^flathub' || $(FLATPAK) remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+	@$(FLATPAK) info org.gnome.Platform//$(FLATPAK_RUNTIME_VERSION) >/dev/null 2>&1 || $(FLATPAK) install -y flathub org.gnome.Platform//$(FLATPAK_RUNTIME_VERSION)
+	@$(FLATPAK) info org.gnome.Sdk//$(FLATPAK_RUNTIME_VERSION) >/dev/null 2>&1 || $(FLATPAK) install -y flathub org.gnome.Sdk//$(FLATPAK_RUNTIME_VERSION)
+
+# Only the submodules the flatpak build needs. slang needs --recursive: its
+# build pulls in nested submodules under external/slang/external/ that a plain
+# init leaves empty.
+flatpak-submodules:
+	@test -e external/slang/external/glslang/CMakeLists.txt || git submodule update --init --recursive external/slang
+	@test -e external/optix-dev/README.md || git submodule update --init external/optix-dev
+	@test -e external/vtracer/Cargo.toml || git submodule update --init external/vtracer
+
+# Skips the Docker rebuild if cubins are already vendored. Delete
+# $(CUDA_ARTIFACTS_PREBUILT_DIR)/ to force regeneration (e.g. after a shader change).
+flatpak-cuda-vendor: flatpak-submodules
+	@if [ -z "$$(ls -A $(CUDA_ARTIFACTS_PREBUILT_DIR) 2>/dev/null)" ]; then \
+		$(MAKE) cuda-artifacts-image; \
+	else \
+		echo "CUDA cubins already vendored at $(CUDA_ARTIFACTS_PREBUILT_DIR)/, skipping"; \
+	fi
+
+flatpak-skeleton: flatpak-sdk metainfo-check desktop-file-check
+	$(FLATPAK_BUILDER) --force-clean $(FLATPAK_BUILD_DIR) $(FLATPAK_MANIFEST)
+
+# Rust nightly Sdk extension: the flatpak build's toolchain.
+flatpak-rust-sdk:
+	@$(FLATPAK) info org.freedesktop.Sdk.Extension.rust-nightly//$(FLATPAK_SDK_EXTENSION_BRANCH) >/dev/null 2>&1 || $(FLATPAK) install -y flathub org.freedesktop.Sdk.Extension.rust-nightly//$(FLATPAK_SDK_EXTENSION_BRANCH)
+
+# LLVM Sdk extension: bindgen / opencv-binding-generator need libclang + clang,
+# which org.gnome.Sdk doesn't ship.
+flatpak-llvm-sdk:
+	@$(FLATPAK) info org.freedesktop.Sdk.Extension.llvm22//$(FLATPAK_SDK_EXTENSION_BRANCH) >/dev/null 2>&1 || $(FLATPAK) install -y flathub org.freedesktop.Sdk.Extension.llvm22//$(FLATPAK_SDK_EXTENSION_BRANCH)
+
+# In-sandbox smoke test -- run with CARGO=cargo after sourcing the extension's
+# enable.sh, e.g.:
+#   source /usr/lib/sdk/rust-nightly/enable.sh && make flatpak-rust-check CARGO=cargo
+# Checks one leaf crate (no native deps) rather than the whole workspace.
+flatpak-rust-check:
+	rustc --version
+	$(CARGO) --version
+	$(CARGO) check -p shrimply-math-core
+
+# Full flatpak build from a fresh clone in one command: SDK/runtime, both Sdk
+# extensions, submodules, vendored cubins, then the manifest build (a real
+# hour-plus compile of all the dependency modules from source). Needs Docker
+# and network access.
+flatpak-bootstrap: flatpak-sdk flatpak-rust-sdk flatpak-llvm-sdk flatpak-cuda-vendor flatpak-skeleton
+	@echo "Flatpak packaging reproduced."
+
+# Produces a single-file .flatpak bundle (the distribution model, not Flathub --
+# blocked by the NVIDIA redistributables and the pinned Rust nightly).
+FLATPAK_APP_ID ?= dev.shrimply.Shrimply
+FLATPAK_REPO_DIR ?= repo
+FLATPAK_BUNDLE ?= $(FLATPAK_APP_ID).flatpak
+dist: flatpak-sdk flatpak-rust-sdk flatpak-llvm-sdk flatpak-cuda-vendor metainfo-check desktop-file-check
+	$(FLATPAK_BUILDER) --repo=$(FLATPAK_REPO_DIR) --force-clean $(FLATPAK_BUILD_DIR) $(FLATPAK_MANIFEST)
+	# build-bundle acts on a repo dir, not an installation, and rejects the
+	# --user/--system flags the install steps need -- firstword drops them.
+	$(firstword $(FLATPAK)) build-bundle $(FLATPAK_REPO_DIR) $(FLATPAK_BUNDLE) $(FLATPAK_APP_ID)
+	@echo "Flatpak bundle: $(FLATPAK_BUNDLE)"
 
 dev: SHELL := /bin/bash
 desktop-icon:
@@ -219,7 +316,7 @@ build: native-deps cuda-artifacts
 release: native-deps cuda-artifacts
 	$(BUILD_ENV) $(CARGO) build --release -p $(EDITOR_PACKAGE) -p $(LAUNCHER_PACKAGE) -p $(MCP_PACKAGE) --bins
 
-check: native-deps qt-native-deps cuda-artifacts fmt source-size-check cargo-check lint server-python-check manim-python-check docs-check
+check: native-deps qt-native-deps cuda-artifacts fmt source-size-check cargo-check lint server-python-check manim-python-check docs-check metainfo-check desktop-file-check
 
 components-check: native-deps qt-native-deps
 	$(DEV_BUILD_ENV) QMAKE=$(QT_QMAKE) $(CARGO) check -p $(FRAMEGRAPH_CORE_PACKAGE) -p $(GTK_COMPONENTS_PACKAGE) -p $(QT_COMPONENTS_PACKAGE) -p $(GTK_COMPONENTS_DEMO_PACKAGE) -p $(QT_COMPONENTS_DEMO_PACKAGE) --all-targets
@@ -255,6 +352,14 @@ manim-visual-check: native-deps
 
 manim-parameter-check: native-deps
 	$(DEV_BUILD_ENV) $(CARGO) test -p shrimply-manim-parser --test two_pass_parameters -- --ignored --nocapture
+
+metainfo-check:
+	@command -v $(APPSTREAMCLI) >/dev/null 2>&1 || { echo "Installing appstream..."; $(PACMAN) -S --noconfirm appstream; }
+	$(APPSTREAMCLI) validate assets/dev.shrimply.Shrimply.metainfo.xml
+
+desktop-file-check:
+	@command -v $(DESKTOP_FILE_VALIDATE) >/dev/null 2>&1 || { echo "Installing desktop-file-utils..."; $(PACMAN) -S --noconfirm desktop-file-utils; }
+	$(DESKTOP_FILE_VALIDATE) assets/dev.shrimply.Shrimply.desktop
 
 cargo-check: native-deps qt-native-deps slang-compiler
 	$(DEV_BUILD_ENV) QMAKE=$(QT_QMAKE) $(CARGO) check -p $(EDITOR_PACKAGE) -p $(QT_EDITOR_PACKAGE) -p $(LAUNCHER_PACKAGE) -p $(QT_LAUNCHER_PACKAGE) -p $(MCP_PACKAGE) --bins
@@ -340,10 +445,11 @@ install: release desktop-icon
 	$(INSTALL) -Dm755 target/release/$(BIN_NAME) "$(DESTDIR)$(BINDIR)/$(BIN_NAME)"
 	$(INSTALL) -Dm755 target/release/$(EDITOR_BIN_NAME) "$(DESTDIR)$(BINDIR)/$(EDITOR_BIN_NAME)"
 	$(INSTALL) -Dm755 target/release/$(MCP_BIN_NAME) "$(DESTDIR)$(BINDIR)/$(MCP_BIN_NAME)"
+	$(INSTALL) -Dm644 LICENSE "$(DESTDIR)$(LICENSE_DIR)/Shrimply.txt"
 	$(INSTALL) -Dm644 $(LIP_SYNC_MODEL) "$(DESTDIR)$(LIP_SYNC_RESOURCE_DIR)/pocketsphinx-ci.model"
-	$(INSTALL) -Dm644 vendor/pocketsphinx/LICENSE "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/PocketSphinx-code.txt"
-	$(INSTALL) -Dm644 vendor/pocketsphinx/MODEL-LICENSE "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/PocketSphinx-model.txt"
-	$(INSTALL) -Dm644 vendor/rhubarb-lip-sync/LICENSE "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/Rhubarb-Lip-Sync.txt"
+	$(INSTALL) -Dm644 vendor/pocketsphinx/LICENSE "$(DESTDIR)$(LICENSE_DIR)/PocketSphinx-code.txt"
+	$(INSTALL) -Dm644 vendor/pocketsphinx/MODEL-LICENSE "$(DESTDIR)$(LICENSE_DIR)/PocketSphinx-model.txt"
+	$(INSTALL) -Dm644 vendor/rhubarb-lip-sync/LICENSE "$(DESTDIR)$(LICENSE_DIR)/Rhubarb-Lip-Sync.txt"
 	$(INSTALL) -d "$(DESTDIR)$(ICONS_RESOURCE_DIR)"
 	cp -a assets/icons/. "$(DESTDIR)$(ICONS_RESOURCE_DIR)/"
 	sed -e 's|^Exec=.*|Exec=$(BINDIR)/$(BIN_NAME) %f|' -e 's|^TryExec=.*|TryExec=$(BINDIR)/$(BIN_NAME)|' $(DESKTOP_FILE) | $(INSTALL) -Dm644 /dev/stdin "$(DESTDIR)$(APPLICATIONSDIR)/dev.shrimply.Shrimply.desktop"
@@ -355,10 +461,11 @@ install: release desktop-icon
 install-qt: qt-release desktop-icon
 	$(INSTALL) -Dm755 target/release/$(QT_BIN_NAME) "$(DESTDIR)$(BINDIR)/$(QT_BIN_NAME)"
 	$(INSTALL) -Dm755 target/release/$(QT_EDITOR_BIN_NAME) "$(DESTDIR)$(BINDIR)/$(QT_EDITOR_BIN_NAME)"
+	$(INSTALL) -Dm644 LICENSE "$(DESTDIR)$(LICENSE_DIR)/Shrimply.txt"
 	$(INSTALL) -Dm644 $(LIP_SYNC_MODEL) "$(DESTDIR)$(LIP_SYNC_RESOURCE_DIR)/pocketsphinx-ci.model"
-	$(INSTALL) -Dm644 vendor/pocketsphinx/LICENSE "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/PocketSphinx-code.txt"
-	$(INSTALL) -Dm644 vendor/pocketsphinx/MODEL-LICENSE "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/PocketSphinx-model.txt"
-	$(INSTALL) -Dm644 vendor/rhubarb-lip-sync/LICENSE "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/Rhubarb-Lip-Sync.txt"
+	$(INSTALL) -Dm644 vendor/pocketsphinx/LICENSE "$(DESTDIR)$(LICENSE_DIR)/PocketSphinx-code.txt"
+	$(INSTALL) -Dm644 vendor/pocketsphinx/MODEL-LICENSE "$(DESTDIR)$(LICENSE_DIR)/PocketSphinx-model.txt"
+	$(INSTALL) -Dm644 vendor/rhubarb-lip-sync/LICENSE "$(DESTDIR)$(LICENSE_DIR)/Rhubarb-Lip-Sync.txt"
 	sed -e 's|^Exec=.*|Exec=$(BINDIR)/$(QT_BIN_NAME) %f|' -e 's|^TryExec=.*|TryExec=$(BINDIR)/$(QT_BIN_NAME)|' $(QT_DESKTOP_FILE) | $(INSTALL) -Dm644 /dev/stdin "$(DESTDIR)$(APPLICATIONSDIR)/dev.shrimply.Shrimply.Qt.desktop"
 	@if test -z "$(DESTDIR)"; then \
 		command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$(APPLICATIONSDIR)" >/dev/null || true; \
@@ -381,9 +488,10 @@ uninstall:
 	rm -f "$(DESTDIR)$(BINDIR)/$(EDITOR_BIN_NAME)"
 	rm -f "$(DESTDIR)$(BINDIR)/$(MCP_BIN_NAME)"
 	rm -rf "$(DESTDIR)$(LIP_SYNC_RESOURCE_DIR)"
-	rm -f "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/PocketSphinx-code.txt"
-	rm -f "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/PocketSphinx-model.txt"
-	rm -f "$(DESTDIR)$(LIP_SYNC_LICENSE_DIR)/Rhubarb-Lip-Sync.txt"
+	rm -f "$(DESTDIR)$(LICENSE_DIR)/Shrimply.txt"
+	rm -f "$(DESTDIR)$(LICENSE_DIR)/PocketSphinx-code.txt"
+	rm -f "$(DESTDIR)$(LICENSE_DIR)/PocketSphinx-model.txt"
+	rm -f "$(DESTDIR)$(LICENSE_DIR)/Rhubarb-Lip-Sync.txt"
 	rm -rf "$(DESTDIR)$(ICONS_RESOURCE_DIR)"
 	rm -f "$(DESTDIR)$(APPLICATIONSDIR)/dev.shrimply.Shrimply.desktop"
 	rm -f "$(DESTDIR)$(ICONDIR)/dev.shrimply.Shrimply.svg"

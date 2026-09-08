@@ -36,24 +36,36 @@ fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/usr/local/cuda"));
     let host = env::var("CUDA_HOST_CXX").unwrap_or_else(|_| "g++-15".to_owned());
+    // nvcc doesn't run inside the flatpak sandbox, so cubins can be prebuilt
+    // outside it and vendored at `prebuilt/<CUDA_TARGET>/<module>.cubin`
+    // (gitignored; `make flatpak-cuda-vendor` regenerates them). When a
+    // vendored cubin is present, copy it instead of running slangc+nvcc --
+    // delete it to force a rebuild after editing that shader.
+    let prebuilt = manifest.join("prebuilt").join(CUDA_TARGET);
     let mut bindings = String::new();
     for module in MODULES.lines() {
-        let source = shaders.join(format!("{module}.slang"));
-        let artifact = compiler.compile(&source, Target::Cuda, &[]);
         let image = output.join(format!("{module}.cubin"));
-        let status = Command::new(toolkit.join("bin/nvcc"))
-            .arg(format!("--compiler-bindir={host}"))
-            .args(["--cubin", "-O2", "-w"])
-            .arg(format!("--gpu-architecture={CUDA_TARGET}"))
-            .arg(output.join(artifact.filename))
-            .arg("-o")
-            .arg(&image)
-            .status()
-            .expect("compile generated CUDA source with NVCC");
-        assert!(
-            status.success(),
-            "compile CUDA kernel module {module}: {status}"
-        );
+        let vendored = prebuilt.join(format!("{module}.cubin"));
+        if vendored.exists() {
+            fs::copy(&vendored, &image)
+                .unwrap_or_else(|error| panic!("copy vendored cubin for {module}: {error}"));
+        } else {
+            let source = shaders.join(format!("{module}.slang"));
+            let artifact = compiler.compile(&source, Target::Cuda, &[]);
+            let status = Command::new(toolkit.join("bin/nvcc"))
+                .arg(format!("--compiler-bindir={host}"))
+                .args(["--cubin", "-O2", "-w", "-allow-unsupported-compiler"])
+                .arg(format!("--gpu-architecture={CUDA_TARGET}"))
+                .arg(output.join(artifact.filename))
+                .arg("-o")
+                .arg(&image)
+                .status()
+                .expect("compile generated CUDA source with NVCC");
+            assert!(
+                status.success(),
+                "compile CUDA kernel module {module}: {status}"
+            );
+        }
         bindings.push_str(&format!(
             "pub const {}: &[u8] = include_bytes!({:?});\n",
             module.to_uppercase(),
