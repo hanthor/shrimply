@@ -74,10 +74,15 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=SHRIMPLY_POCKETSPHINX_CACHE");
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is set by Cargo"));
+    // Find the target/<profile> directory by name rather than a fixed ancestor
+    // count -- OUT_DIR's depth isn't guaranteed and a fixed `.nth(3)` can land
+    // one level off. PROFILE names the profile directory.
+    let profile_name = env::var("PROFILE").expect("PROFILE is set by Cargo");
     let profile = out
         .ancestors()
-        .nth(3)
-        .expect("standard Cargo OUT_DIR layout");
+        .find(|path| path.file_name().is_some_and(|name| name == profile_name.as_str()))
+        .expect("OUT_DIR contains a Cargo profile directory component")
+        .to_path_buf();
     let target = profile
         .parent()
         .expect("Cargo profile directory has a parent");
