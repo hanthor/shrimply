@@ -5,7 +5,6 @@ edition = "2024"
 readme = "README.md"
 
 [dependencies]
-shrimply-cuda.workspace = true
 ffmpeg-next.workspace = true
 libc.workspace = true
 shrimply-asset = { path = "../../asset" }
