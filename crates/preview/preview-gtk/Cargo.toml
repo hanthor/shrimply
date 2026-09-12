@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 adw.workspace = true
-shrimply-cuda.workspace = true
 glam.workspace = true
 glow.workspace = true
 gtk.workspace = true
