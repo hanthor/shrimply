@@ -3,11 +3,15 @@ name = "shrimply-preview-runtime"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["cuda"]
+cuda = ["dep:shrimply-cuda", "shrimply-video-cuda/cuda"]
+
 [dependencies]
 shrimply-3dgs = { path = "../../3d/3dgs" }
 shrimply-preview-interaction-core = { path = "../preview-interaction-core" }
 shrimply-skia-gl = { path = "../../ui/skia-gl" }
-shrimply-cuda.workspace = true
+shrimply-cuda = { workspace = true, optional = true }
 glam.workspace = true
 glow.workspace = true
 libc.workspace = true

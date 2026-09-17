@@ -2,6 +2,7 @@ use glam::IVec2;
 use glow::HasContext;
 use shrimply_math_color::Color;
 
+#[cfg(feature = "cuda")]
 use crate::cuda_gl::CudaTexture;
 use crate::gl_loader;
 use crate::preferences::store::{PreviewDownsampleMethod, PreviewUpsampleMethod};
@@ -23,7 +24,9 @@ pub struct VideoRenderer {
     program: glow::NativeProgram,
     vao: glow::NativeVertexArray,
     rgba_texture: glow::NativeTexture,
+    #[cfg(feature = "cuda")]
     rgba_cuda: Option<CudaTexture>,
+    #[cfg(feature = "cuda")]
     cuda_context: Option<shrimply_cuda::sys::CUcontext>,
     texture_width: u32,
     texture_height: u32,
@@ -52,7 +55,9 @@ impl VideoRenderer {
                 program,
                 vao,
                 rgba_texture,
+                #[cfg(feature = "cuda")]
                 rgba_cuda: None,
+                #[cfg(feature = "cuda")]
                 cuda_context: None,
                 texture_width: 0,
                 texture_height: 0,
@@ -150,22 +155,25 @@ impl VideoRenderer {
         if self.last_frame_key == Some(frame.storage_key) {
             return Ok(());
         }
-        self.rgba_cuda
-            .as_ref()
-            .ok_or_else(|| "CUDA RGBA texture is not registered".to_string())?
-            .copy_from_device(
-                frame.buffer.cu_deviceptr(),
-                frame.buffer.memory_kind(),
-                frame.width as usize * std::mem::size_of::<u32>(),
-                frame.width as usize * std::mem::size_of::<u32>(),
-                frame.height as usize,
-            )
-            .map_err(|error| {
-                format!(
-                    "upload preview frame {} to CUDA-GL texture: {error}",
-                    frame.debug_label()
+        #[cfg(feature = "cuda")]
+        {
+            self.rgba_cuda
+                .as_ref()
+                .ok_or_else(|| "CUDA RGBA texture is not registered".to_string())?
+                .copy_from_device(
+                    frame.buffer.cu_deviceptr(),
+                    frame.buffer.memory_kind(),
+                    frame.width as usize * std::mem::size_of::<u32>(),
+                    frame.width as usize * std::mem::size_of::<u32>(),
+                    frame.height as usize,
                 )
-            })?;
+                .map_err(|error| {
+                    format!(
+                        "upload preview frame {} to CUDA-GL texture: {error}",
+                        frame.debug_label()
+                    )
+                })?;
+        }
         self.last_frame_key = Some(frame.storage_key);
         Ok(())
     }
@@ -204,15 +212,24 @@ impl VideoRenderer {
     }
 
     fn ensure_texture(&mut self, frame: &CompositedVideoFrame) -> Result<(), String> {
-        let cuda_context = frame.buffer.context().cu_ctx();
-        if self.texture_width == frame.width
-            && self.texture_height == frame.height
-            && self.cuda_context == Some(cuda_context)
+        #[cfg(feature = "cuda")]
         {
-            return Ok(());
+            let cuda_context = frame.buffer.context().cu_ctx();
+            if self.texture_width == frame.width
+                && self.texture_height == frame.height
+                && self.cuda_context == Some(cuda_context)
+            {
+                return Ok(());
+            }
+            self.rgba_cuda.take();
+            self.cuda_context = None;
         }
-        self.rgba_cuda.take();
-        self.cuda_context = None;
+        #[cfg(not(feature = "cuda"))]
+        {
+            if self.texture_width == frame.width && self.texture_height == frame.height {
+                return Ok(());
+            }
+        }
         unsafe {
             self.gl
                 .bind_texture(glow::TEXTURE_2D, Some(self.rgba_texture));
@@ -237,12 +254,16 @@ impl VideoRenderer {
                 );
             }
         }
-        self.rgba_cuda = Some(CudaTexture::register(
-            self.rgba_texture.0.get(),
-            glow::TEXTURE_2D,
-            frame.buffer.context().clone(),
-        )?);
-        self.cuda_context = Some(cuda_context);
+        #[cfg(feature = "cuda")]
+        {
+            let cuda_context = frame.buffer.context().cu_ctx();
+            self.rgba_cuda = Some(CudaTexture::register(
+                self.rgba_texture.0.get(),
+                glow::TEXTURE_2D,
+                frame.buffer.context().clone(),
+            )?);
+            self.cuda_context = Some(cuda_context);
+        }
         self.texture_width = frame.width;
         self.texture_height = frame.height;
         self.last_frame_key = None;
@@ -252,8 +273,11 @@ impl VideoRenderer {
 
     pub fn destroy(&mut self) {
         self.overlay_renderer.destroy();
-        self.rgba_cuda.take();
-        self.cuda_context = None;
+        #[cfg(feature = "cuda")]
+        {
+            self.rgba_cuda.take();
+            self.cuda_context = None;
+        }
         unsafe {
             self.gl.delete_texture(self.rgba_texture);
             self.gl.delete_vertex_array(self.vao);
