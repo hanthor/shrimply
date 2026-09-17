@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from api.pneuma.inference.device import get_device
 from pathlib import Path
@@ -24,6 +25,9 @@ SWIFT_F0_MODEL_ROOT = model_cache_dir("swift-f0")
 SWIFT_F0_MODEL_PATH = SWIFT_F0_MODEL_ROOT / "model.safetensors"
 SWIFT_F0_ONNX_URL = (
     "https://github.com/lars76/swift-f0/raw/refs/heads/main/swift_f0/model.onnx"
+)
+SWIFT_F0_ONNX_SHA256 = (
+    "3f8a4843b0213d8d6eb10f8ad22b3e8c95a5f10660635467448c9bf72382cfbb"
 )
 
 
@@ -153,11 +157,24 @@ class SwiftF0Torch(nn.Module):
 
 def download_swift_f0_onnx_model(
     target_dir: Path,
+    expected_sha256: str = SWIFT_F0_ONNX_SHA256,
 ) -> Path:
     model_path = target_dir / "model.onnx"
     logger.info("Downloading swift-f0 ONNX model to temporary path %s", model_path)
     downloaded_path, _ = urlretrieve(SWIFT_F0_ONNX_URL, model_path)
-    return Path(downloaded_path)
+    path = Path(downloaded_path)
+    if expected_sha256:
+        sha256_hash = hashlib.sha256()
+        with path.open("rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256_hash.update(chunk)
+        digest = sha256_hash.hexdigest()
+        if digest != expected_sha256:
+            path.unlink(missing_ok=True)
+            raise ValueError(
+                f"Integrity check failed for swift-f0 model: expected {expected_sha256}, got {digest}"
+            )
+    return path
 
 
 def convert_swift_f0_onnx_to_safetensors(
