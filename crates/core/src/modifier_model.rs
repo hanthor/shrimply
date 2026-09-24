@@ -201,3 +201,35 @@ fn endpoint_span(times: impl IntoIterator<Item = Time>) -> KeyframeSpan {
         (start.min(time), end.max(time))
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // `endpoint_span` is private to this module, so it can only be exercised
+    // here. The public functions it backs (`timeline_value_span`, `combine`)
+    // and the rest of this module's public API are covered by
+    // `crates/core/tests/modifier_model_tests.rs`.
+
+    #[test]
+    fn endpoint_span_is_none_for_no_times() {
+        assert_eq!(endpoint_span(Vec::<Time>::new()), None);
+    }
+
+    #[test]
+    fn endpoint_span_orders_start_before_end_regardless_of_input_order() {
+        let t0 = Time::from_seconds(0);
+        let t3 = Time::from_seconds(3);
+        let t5 = Time::from_seconds(5);
+
+        assert_eq!(endpoint_span(vec![t3, t0, t5]), Some((t0, t5)));
+    }
+
+    #[test]
+    fn endpoint_span_single_time_is_a_zero_length_span() {
+        let t = Time::from_seconds(2);
+
+        assert_eq!(endpoint_span(vec![t]), Some((t, t)));
+    }
+}
+
