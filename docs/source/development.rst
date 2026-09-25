@@ -14,6 +14,28 @@ The current development setup targets Fedora and uses the Rust toolchain in
 Initialize the Slang submodule before building. Slang compiles the compositor
 shaders to CUDA, and ``nvcc`` packages the current ``sm_86`` cubins.
 
+macOS Development
+-----------------
+
+To develop on macOS, install Xcode Command Line Tools and the required build dependencies via Homebrew:
+
+.. code-block:: console
+
+   $ xcode-select --install
+   $ brew install rust pkg-config gtk4 libadwaita ffmpeg pipewire
+
+Then build and run using the AppKit launcher with Metal rendering:
+
+.. code-block:: console
+
+   $ make dev-mac
+
+This produces the ``shrimply-appkit`` development binary using Metal for GPU rendering instead of CUDA.
+The AppKit launcher provides native macOS integration and uses ``skia-metal`` for rendering.
+``make appkit-build`` performs a debug build without launching it and writes the binary to ``target/debug/shrimply-appkit``.
+
+For a Qt 6 launcher on macOS instead of AppKit, see the Qt development section below.
+
 Build and check
 ---------------
 
