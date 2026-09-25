@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from api import log_request, request_content_type, resource, respond_error, stream_events
 from api import tts
-from api.tts.errors import log_failure, public_error_message
+from api.errors import log_failure, public_error_message
 from api.tts.protocol import ErrorEvent, SYNTHESIS_REQUEST_VALIDATOR
 from api.tts.requests import parse_request, request_text
 
