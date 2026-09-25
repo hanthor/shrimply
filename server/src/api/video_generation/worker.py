@@ -25,7 +25,7 @@ from api.video_generation.wan.inference import (
     GenerationRequest as WanRequest,
     generate as generate_wan,
 )
-from api.tts.errors import log_failure, public_error_message
+from api.errors import log_failure, public_error_message
 
 logger = logging.getLogger("shrimply.video_generation.worker")
 
