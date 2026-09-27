@@ -20,7 +20,7 @@ from api.pneuma.protocol import (
     ResultEvent,
     WorkerEvent,
 )
-from api.tts.errors import log_failure, public_error_message
+from api.errors import log_failure, public_error_message
 
 logging.basicConfig(
     level=logging.INFO,

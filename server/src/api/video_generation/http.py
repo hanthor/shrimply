@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from api import gpu, log_request, request_content_type, respond_error, stream_events
 from api import resource
-from api.tts.errors import log_failure, public_error_message
+from api.errors import log_failure, public_error_message
 from api.video_generation import generate
 from api.video_generation.protocol import ErrorEvent, GENERATION_REQUEST_VALIDATOR
 from api.video_generation.requests import validate_inputs
