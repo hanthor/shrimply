@@ -201,3 +201,207 @@ fn endpoint_span(times: impl IntoIterator<Item = Time>) -> KeyframeSpan {
         (start.min(time), end.max(time))
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_unique_id_replaces_nil_uuid() {
+        let mut id = Uuid::nil();
+        let mut seen = HashSet::new();
+        
+        ensure_unique_id(&mut id, &mut seen);
+        
+        assert!(!id.is_nil(), "nil UUID should be replaced");
+        assert!(seen.contains(&id), "new UUID should be in seen set");
+    }
+
+    #[test]
+    fn test_ensure_unique_id_preserves_unique_uuid() {
+        let original = Uuid::new_v4();
+        let mut id = original;
+        let mut seen = HashSet::new();
+        
+        ensure_unique_id(&mut id, &mut seen);
+        
+        assert_eq!(id, original, "unique UUID should not be modified");
+        assert!(seen.contains(&id), "UUID should be in seen set");
+    }
+
+    #[test]
+    fn test_ensure_unique_id_detects_collision() {
+        let uuid1 = Uuid::new_v4();
+        let mut uuid2 = uuid1; // collision
+        let mut seen = HashSet::new();
+        seen.insert(uuid1);
+        
+        ensure_unique_id(&mut uuid2, &mut seen);
+        
+        assert_ne!(uuid2, uuid1, "colliding UUID should be replaced");
+        assert!(!uuid2.is_nil(), "replacement UUID should not be nil");
+        assert!(seen.contains(&uuid1), "original UUID should still be in seen");
+    }
+
+    #[test]
+    fn test_timeline_value_span_const_returns_none() {
+        let value = TimelineValue {
+            id: Uuid::new_v4(),
+            base: TimelineBase::Const(42.0f32),
+            expression: None,
+        };
+        
+        let span = timeline_value_span(&value);
+        
+        assert_eq!(span, None, "const timeline value should have no span");
+    }
+
+    #[test]
+    fn test_timeline_value_span_empty_keyframes_returns_none() {
+        let value = TimelineValue {
+            id: Uuid::new_v4(),
+            base: TimelineBase::Keyframes(vec![]),
+            expression: None,
+        };
+        
+        let span = timeline_value_span(&value);
+        
+        assert_eq!(span, None, "empty keyframes should return None");
+    }
+
+    #[test]
+    fn test_combine_empty_spans_returns_none() {
+        let spans: Vec<KeyframeSpan> = vec![];
+        
+        let result = combine(spans);
+        
+        assert_eq!(result, None, "combining empty spans should return None");
+    }
+
+    #[test]
+    fn test_combine_all_none_spans_returns_none() {
+        let spans = vec![None, None, None];
+        
+        let result = combine(spans);
+        
+        assert_eq!(result, None, "combining only None spans should return None");
+    }
+
+    #[test]
+    fn test_combine_single_span() {
+        use shrimply_math_core::fraction_from_integer;
+        let t1 = fraction_from_integer(0);
+        let t2 = fraction_from_integer(10);
+        let spans = vec![Some((t1, t2))];
+        
+        let result = combine(spans);
+        
+        assert_eq!(result, Some((t1, t2)), "single span should be returned unchanged");
+    }
+
+    #[test]
+    fn test_combine_multiple_overlapping_spans() {
+        use shrimply_math_core::fraction_from_integer;
+        let t0 = fraction_from_integer(0);
+        let t5 = fraction_from_integer(5);
+        let t10 = fraction_from_integer(10);
+        let t15 = fraction_from_integer(15);
+        
+        let spans = vec![Some((t0, t10)), Some((t5, t15))];
+        
+        let result = combine(spans);
+        
+        assert_eq!(result, Some((t0, t15)), "spans should be combined to min start and max end");
+    }
+
+    #[test]
+    fn test_combine_with_none_and_some_spans() {
+        use shrimply_math_core::fraction_from_integer;
+        let t0 = fraction_from_integer(0);
+        let t10 = fraction_from_integer(10);
+        let t5 = fraction_from_integer(5);
+        let t15 = fraction_from_integer(15);
+        
+        let spans = vec![None, Some((t0, t10)), None, Some((t5, t15)), None];
+        
+        let result = combine(spans);
+        
+        assert_eq!(result, Some((t0, t15)), "None spans should be ignored");
+    }
+
+    #[test]
+    fn test_endpoint_span_single_time() {
+        use shrimply_math_core::fraction_from_integer;
+        let t = fraction_from_integer(5);
+        
+        let result = endpoint_span(vec![t].into_iter());
+        
+        assert_eq!(result, Some((t, t)), "single time should give same start and end");
+    }
+
+    #[test]
+    fn test_endpoint_span_multiple_times_unsorted() {
+        use shrimply_math_core::fraction_from_integer;
+        let t0 = fraction_from_integer(0);
+        let t5 = fraction_from_integer(5);
+        let t10 = fraction_from_integer(10);
+        
+        let result = endpoint_span(vec![t5, t0, t10].into_iter());
+        
+        assert_eq!(result, Some((t0, t10)), "should find min and max regardless of order");
+    }
+
+    // Mock struct for testing ModifierModel trait
+    struct TestModifier {
+        display_name_val: &'static str,
+    }
+
+    impl ModifierModel for TestModifier {
+        fn display_name(&self) -> &'static str {
+            self.display_name_val
+        }
+
+        fn ensure_ids(&mut self, _seen: &mut HashSet<Uuid>) {
+            // no-op for test
+        }
+
+        fn keyframe_span(&self) -> KeyframeSpan {
+            None
+        }
+    }
+
+    #[test]
+    fn test_modifier_model_default_keywords() {
+        let modifier = TestModifier { display_name_val: "test" };
+        
+        let keywords = modifier.keywords();
+        
+        assert_eq!(keywords, &[], "default keywords should be empty");
+    }
+
+    #[test]
+    fn test_modifier_model_default_number_accessors() {
+        let modifier = TestModifier { display_name_val: "test" };
+        let id = Uuid::new_v4();
+        
+        assert_eq!(modifier.number(id), None);
+        assert_eq!(modifier.number2(id), None);
+        assert_eq!(modifier.number3(id), None);
+        assert_eq!(modifier.text(id), None);
+        assert_eq!(modifier.integer(id), None);
+        assert_eq!(modifier.sample_method(id), None);
+    }
+
+    #[test]
+    fn test_box_modifier_model_delegation() {
+        let modifier = TestModifier { display_name_val: "boxed_test" };
+        let boxed: Box<dyn ModifierModel> = Box::new(modifier);
+        
+        assert_eq!(boxed.display_name(), "boxed_test");
+        assert_eq!(boxed.keywords(), &[]);
+        assert_eq!(boxed.keyframe_span(), None);
+        
+        let id = Uuid::new_v4();
+        assert_eq!(boxed.number(id), None);
+    }
+}
