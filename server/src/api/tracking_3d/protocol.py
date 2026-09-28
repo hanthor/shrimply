@@ -49,11 +49,6 @@ class ProgressEvent(ProtocolModel):
     total_frames: int = Field(gt=0)
 
 
-class QueuedEvent(ProtocolModel):
-    kind: Literal["queued"] = "queued"
-    position: int = Field(gt=0)
-
-
 class CameraEvent(ProtocolModel):
     kind: Literal["camera"] = "camera"
     frame_index: int = Field(ge=0)
@@ -89,7 +84,6 @@ type WorkerEvent = Annotated[
     ProgressEvent | CameraEvent | ResultEvent | ErrorEvent,
     Field(discriminator="kind"),
 ]
-type PublicEvent = QueuedEvent | WorkerEvent
 WORKER_EVENT_VALIDATOR = TypeAdapter(WorkerEvent)
 
 
