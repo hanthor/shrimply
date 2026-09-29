@@ -201,3 +201,134 @@ fn endpoint_span(times: impl IntoIterator<Item = Time>) -> KeyframeSpan {
         (start.min(time), end.max(time))
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Mock implementation of ModifierModel for testing trait defaults
+    struct MockModifier {
+        display: &'static str,
+    }
+
+    impl ModifierModel for MockModifier {
+        fn display_name(&self) -> &'static str {
+            self.display
+        }
+
+        fn ensure_ids(&mut self, _seen: &mut HashSet<Uuid>) {}
+
+        fn keyframe_span(&self) -> KeyframeSpan {
+            None
+        }
+    }
+
+    #[test]
+    fn test_ensure_unique_id_replaces_nil_uuid() {
+        let mut id = Uuid::nil();
+        let mut seen = HashSet::new();
+        ensure_unique_id(&mut id, &mut seen);
+        assert!(!id.is_nil(), "nil UUID should be replaced");
+        assert!(seen.contains(&id), "ID should be added to seen set");
+    }
+
+    #[test]
+    fn test_ensure_unique_id_keeps_non_nil_unseen_uuid() {
+        let original_id = Uuid::new_v4();
+        let mut id = original_id;
+        let mut seen = HashSet::new();
+        ensure_unique_id(&mut id, &mut seen);
+        assert_eq!(id, original_id, "unseen non-nil UUID should not change");
+        assert!(seen.contains(&id), "ID should be added to seen set");
+    }
+
+    #[test]
+    fn test_ensure_unique_id_regenerates_on_collision() {
+        let existing_id = Uuid::new_v4();
+        let mut id = existing_id;
+        let mut seen = HashSet::new();
+        seen.insert(existing_id);
+        ensure_unique_id(&mut id, &mut seen);
+        assert_ne!(
+            id, existing_id,
+            "colliding UUID should be replaced with new one"
+        );
+        assert!(seen.contains(&id), "new ID should be in seen set");
+        assert!(!id.is_nil(), "new ID should not be nil");
+    }
+
+    #[test]
+    fn test_ensure_unique_id_handles_multiple_collisions() {
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let mut id = id1;
+        let mut seen = HashSet::new();
+        seen.insert(id1);
+        seen.insert(id2);
+        ensure_unique_id(&mut id, &mut seen);
+        assert!(
+            id != id1 && id != id2,
+            "should find unique ID despite multiple collisions"
+        );
+        assert!(seen.contains(&id));
+    }
+
+    #[test]
+    fn test_combine_empty_spans() {
+        let result = combine(vec![]);
+        assert_eq!(result, None, "combining empty spans should return None");
+    }
+
+    #[test]
+    fn test_combine_all_none() {
+        let result = combine(vec![None, None]);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_modifier_trait_default_keywords_empty() {
+        let mock = MockModifier {
+            display: "test",
+        };
+        assert_eq!(mock.keywords(), &[]);
+    }
+
+    #[test]
+    fn test_modifier_trait_default_accessors_return_none() {
+        let mock = MockModifier {
+            display: "test",
+        };
+        let id = Uuid::new_v4();
+        assert_eq!(mock.number(id), None);
+        assert_eq!(mock.number2(id), None);
+        assert_eq!(mock.number3(id), None);
+        assert_eq!(mock.text(id), None);
+        assert_eq!(mock.integer(id), None);
+        assert_eq!(mock.sample_method(id), None);
+    }
+
+    #[test]
+    fn test_box_modifier_delegates_display_name() {
+        let boxed: Box<dyn ModifierModel> = Box::new(MockModifier {
+            display: "boxed",
+        });
+        assert_eq!(boxed.display_name(), "boxed");
+    }
+
+    #[test]
+    fn test_box_modifier_delegates_keywords() {
+        let boxed: Box<dyn ModifierModel> = Box::new(MockModifier {
+            display: "test",
+        });
+        assert_eq!(boxed.keywords(), &[]);
+    }
+
+    #[test]
+    fn test_box_modifier_delegates_accessor_returns_none() {
+        let boxed: Box<dyn ModifierModel> = Box::new(MockModifier {
+            display: "test",
+        });
+        let id = Uuid::new_v4();
+        assert_eq!(boxed.number(id), None);
+    }
+}
