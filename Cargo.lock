@@ -5579,7 +5579,6 @@ version = "0.1.0"
 dependencies = [
  "glam 0.33.5",
  "hashbrown 0.17.1",
- "num-traits",
  "serde",
  "shrimply-math-color",
  "shrimply-render-core",
@@ -6285,7 +6284,6 @@ dependencies = [
  "objc2",
  "objc2-foundation",
  "rmp-serde",
- "serde",
  "shrimply-asset",
  "shrimply-manim-ir",
  "shrimply-math-core",
@@ -6333,7 +6331,6 @@ name = "shrimply-math-core"
 version = "0.1.0"
 dependencies = [
  "fraction",
- "num-traits",
  "serde",
 ]
 
@@ -6354,8 +6351,6 @@ version = "0.1.0"
 dependencies = [
  "glam 0.33.5",
  "hashbrown 0.17.1",
- "num-traits",
- "serde",
  "shrimply-interpolation",
  "shrimply-math-color",
  "shrimply-math-core",
@@ -6489,7 +6484,6 @@ dependencies = [
  "shrimply-math-geometry",
  "shrimply-paint-interpolation",
  "shrimply-timeline-value",
- "uuid",
 ]
 
 [[package]]
@@ -6949,7 +6943,6 @@ dependencies = [
  "glam 0.33.5",
  "nalgebra",
  "num-traits",
- "serde",
  "serde_json",
  "shrimply-cuda",
  "shrimply-math-color",
@@ -7004,7 +6997,6 @@ dependencies = [
  "shrimply-math-color",
  "shrimply-transform-3d",
  "strum",
- "uuid",
 ]
 
 [[package]]
@@ -7097,7 +7089,6 @@ dependencies = [
 name = "shrimply-state"
 version = "0.1.0"
 dependencies = [
- "hashbrown 0.17.1",
  "shrimply-benchmarking",
  "shrimply-manim-core",
  "shrimply-math-core",
@@ -7106,7 +7097,6 @@ dependencies = [
  "shrimply-project",
  "shrimply-support",
  "tracing",
- "uuid",
 ]
 
 [[package]]

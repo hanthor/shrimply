@@ -14,4 +14,3 @@ shrimply-core = { path = "../../core" }
 shrimply-math-color = { path = "../../math/color" }
 strum = { workspace = true, features = ["derive"] }
 shrimply-transform-3d = { path = "../transform-3d" }
-uuid = { workspace = true, features = ["v4", "serde"] }
