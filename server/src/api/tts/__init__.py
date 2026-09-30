@@ -102,7 +102,7 @@ def synthesize(
 ) -> None:
     precision = request_precision(request)
     key = resource.WorkerKey("tts", request.model, (("precision", precision),))
-    profile = tts_resources.request(
+    profile = tts_resources.profile(
         request.model,
         precision,
         gpu.device.startswith("cuda:"),
