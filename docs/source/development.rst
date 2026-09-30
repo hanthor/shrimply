@@ -65,6 +65,31 @@ server, and Manim worker each have their own ``pyproject.toml`` and committed
 ``uv.lock``. Use their Makefile targets or ``uv run --project`` from the
 repository root; do not install their dependencies globally.
 
+Server scripts
+--------------
+
+``server/scripts`` has two standalone developer tools, run the same way as
+``make dev-server`` (``uv run --project server --locked <path> [args]``):
+
+``benchmark_index_tts.py``
+   Benchmarks the local IndexTTS Stable and Beta runtimes across model
+   version, precision, and sampling mode. See ``--help`` for the full option
+   set (voice, language, run count, kernel profiling, output directory).
+
+.. code-block:: console
+
+   $ uv run --project server --locked server/scripts/benchmark_index_tts.py --help
+
+``validate_video_generation.py``
+   Exercises the video-generation server API end to end against a running
+   ``make dev-server`` instance, for one of three cases: ``base-t2va``,
+   ``sketch-fl2va``, or ``base-ref2va``.
+
+.. code-block:: console
+
+   $ uv run --project server --locked server/scripts/validate_video_generation.py \
+       base-t2va --output-directory /tmp/out --image ref.png --reference-video ref.mp4
+
 Repository layout
 -----------------
 
