@@ -89,7 +89,7 @@ def convert(
     send_event: Callable[[WorkerEvent | resource.QueuedEvent], None],
 ) -> None:
     key = resource.WorkerKey("pneuma", request.model)
-    profile = pneuma_resources.request(request.model, MODEL_DIRECTORY)
+    profile = pneuma_resources.profile(request.model, MODEL_DIRECTORY)
     payload = msgspec.msgpack.encode(request.model_dump(mode="python"))
     lease = resource.scheduler.acquire(
         job,

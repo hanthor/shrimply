@@ -12,7 +12,7 @@ MAXIMUM_DECODED_AUDIO_BYTES = 512 * 1024**2
 RAM_WORKSPACE = MAXIMUM_DECODED_AUDIO_BYTES * 4
 
 
-def request(model_id: str, model_directory: Path) -> ResourceProfile:
+def profile(model_id: str, model_directory: Path) -> ResourceProfile:
     if model_id == "none":
         return ResourceProfile(active_ram=RAM_WORKSPACE)
     path = model_directory / model_id
