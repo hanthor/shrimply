@@ -11,4 +11,3 @@ shrimply-paint-interpolation = { path = "../paint-interpolation" }
 shrimply-timeline-value = { path = "../../timeline/timeline-value" }
 shrimply-math-color = { path = "../../math/color" }
 shrimply-math-geometry = { path = "../../math/geometry" }
-uuid = { workspace = true, features = ["v4", "serde"] }
