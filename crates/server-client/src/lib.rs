@@ -310,6 +310,7 @@ pub fn analyze_tracking_3d(
     tracing::info!(%endpoint, job_id = %cancellation.job_id(), archive = %archive.display(), body_bytes = length, "Sending 3D tracking request");
     let request = reqwest::blocking::Client::builder()
         .connect_timeout(REQUEST_TIMEOUT)
+        .timeout(COMPUTE_STREAM_READ_TIMEOUT)
         .build()
         .map_err(|error| error.to_string())?
         .post(&endpoint)
