@@ -326,7 +326,7 @@ def load_vggt_slam(device: torch.device):
     if not persistent_salad_checkpoint.exists():
         persistent_salad_checkpoint.parent.mkdir(parents=True, exist_ok=True)
         torch.hub.download_url_to_file(
-            SALAD_CHECKPOINT_URL, str(persistent_salad_checkpoint)
+            SALAD_CHECKPOINT_URL, str(persistent_salad_checkpoint), timeout=300
         )
     salad_checkpoint = Path(torch.hub.get_dir()) / "checkpoints" / "dino_salad.ckpt"
     if not salad_checkpoint.exists():
