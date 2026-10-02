@@ -45,7 +45,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pyrefly==1.2.0", "types-tqdm>=4.70"]
+dev = ["pyrefly==1.2.0", "types-tqdm>=4.70", "pytest>=8.0,<9", "pytest-cov>=6.0,<7"]
 
 [tool.uv]
 exclude-dependencies = ["onnxruntime", "opencv-python", "sox"]
@@ -76,6 +76,36 @@ torchvision = [
 name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-v --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "requires_model: marks tests that require downloading large model files",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "**/test_*.py",
+    "**/conftest.py",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
 
 [tool.pyrefly]
 project-includes = [
