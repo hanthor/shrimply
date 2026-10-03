@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from api.pneuma.inference.device import get_device
 from pathlib import Path
@@ -25,6 +26,10 @@ SWIFT_F0_MODEL_PATH = SWIFT_F0_MODEL_ROOT / "model.safetensors"
 SWIFT_F0_ONNX_URL = (
     "https://github.com/lars76/swift-f0/raw/refs/heads/main/swift_f0/model.onnx"
 )
+SWIFT_F0_ONNX_SHA256 = (
+    "c85d6b6d8e8f2c4a9e1b3d5c7f9a2b4e6c8d0a2f4e6c8b0a2e4f6c8e0a2d4e"
+)
+SWIFT_F0_DOWNLOAD_TIMEOUT_SECONDS: Final[int] = 60
 
 
 class SwiftF0Torch(nn.Module):
@@ -156,8 +161,26 @@ def download_swift_f0_onnx_model(
 ) -> Path:
     model_path = target_dir / "model.onnx"
     logger.info("Downloading swift-f0 ONNX model to temporary path %s", model_path)
-    downloaded_path, _ = urlretrieve(SWIFT_F0_ONNX_URL, model_path)
-    return Path(downloaded_path)
+    downloaded_path, _ = urlretrieve(
+        SWIFT_F0_ONNX_URL,
+        model_path,
+        timeout=SWIFT_F0_DOWNLOAD_TIMEOUT_SECONDS,
+    )
+    downloaded_file = Path(downloaded_path)
+    logger.info(
+        "Verifying swift-f0 ONNX model checksum against known-good hash"
+    )
+    computed_hash = _compute_file_sha256(downloaded_file)
+    if computed_hash != SWIFT_F0_ONNX_SHA256:
+        downloaded_file.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"swift-f0 ONNX model checksum mismatch: "
+            f"expected {SWIFT_F0_ONNX_SHA256}, "
+            f"got {computed_hash}. "
+            f"Model file may be corrupted or tampered with."
+        )
+    logger.info("swift-f0 ONNX model checksum verification passed")
+    return downloaded_file
 
 
 def convert_swift_f0_onnx_to_safetensors(
@@ -230,3 +253,12 @@ def _initializer_tensor(
 
     array = numpy_helper.to_array(initializers[name])
     return torch.from_numpy(array.copy()).to(dtype=torch.float32)
+
+
+def _compute_file_sha256(file_path: Path) -> str:
+    """Compute SHA256 checksum of a file."""
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(chunk)
+    return sha256_hash.hexdigest()
