@@ -29,6 +29,7 @@ Start here
 * :doc:`Compute server <server/index>` covers optional AI and compute features.
 * :doc:`MCP integration <integrations/mcp>` documents live editor automation.
 * :doc:`Development <development>` contains the supported repository workflow.
+* :doc:`Troubleshooting <troubleshooting>` covers common build, dependency, and runtime issues.
 
 .. toctree::
    :maxdepth: 2
@@ -45,4 +46,5 @@ Start here
    server/index
    integrations/mcp
    development
+   troubleshooting
    licenses
