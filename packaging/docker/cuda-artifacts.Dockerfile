@@ -19,11 +19,20 @@ RUN dnf install -y \
 COPY Makefile ./
 RUN make deps-fedora DNF="dnf -y"
 
-# CUDA toolkit from NVIDIA's own repo (Fedora's repos don't ship it)
+# CUDA toolkit from NVIDIA's own repo (Fedora's repos don't ship it).
+# Pinned, not bare `cuda-toolkit`: this nvcc compiles the .cubin files vendored
+# into the flatpak, so the toolkit version is part of this build's shipped
+# output and must not float with whatever NVIDIA published last. Keeping the
+# version in the Dockerfile text also means flatpak.yml's
+# hashFiles(...cuda-artifacts.Dockerfile) moves the `cuda-cubins` cache key
+# whenever it is bumped, so stale cubins can't survive a toolkit change.
+# To bump: change this, and delete crates/render-cuda/prebuilt/ to force a
+# regeneration (build.rs copies a vendored cubin in preference to running nvcc).
+ARG CUDA_TOOLKIT_VERSION=13-4
 RUN . /etc/os-release && \
     curl -fsSL -o /etc/yum.repos.d/cuda-fedora.repo \
         "https://developer.download.nvidia.com/compute/cuda/repos/fedora${VERSION_ID}/x86_64/cuda-fedora${VERSION_ID}.repo" && \
-    dnf install -y cuda-toolkit && \
+    dnf install -y "cuda-toolkit-${CUDA_TOOLKIT_VERSION}" && \
     dnf clean all
 
 COPY . .
