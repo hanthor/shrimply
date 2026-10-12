@@ -1,0 +1,13 @@
+[package]
+name = "shrimply-events"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+# Canonical definition of QueuedEvent used across all shrimply services.
+# Consolidates event types from pneuma, stt, tts, video_generation, sam2,
+# tracking_3d, and Python services into one shared schema.
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
