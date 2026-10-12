@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/events",
     "crates/apps/editor-appkit",
     "crates/cuda/bridge",
     "crates/apps/editor-qt",
