@@ -9,8 +9,9 @@ capabilities to the editor.
 Run locally
 -----------
 
-The server is a separate uv project requiring Python 3.14. From the repository
-root, run its locked environment with:
+The server is a separate uv project requiring Python ``>=3.14,<3.15`` and an
+installed `uv <https://docs.astral.sh/uv/getting-started/installation/>`__.
+From the repository root, run its locked environment with:
 
 .. code-block:: console
 
@@ -29,10 +30,15 @@ starting a large download.
 Connect Shrimply
 ----------------
 
-The local server listens at ``http://127.0.0.1:8787`` by default. In Shrimply,
-open :menuselection:`Preferences --> External`. Select the local server under
-:guilabel:`Inference Servers`, then choose one of the compute devices reported
-by that server.
+The editor uses ``http://127.0.0.1:8787`` as its default connection URL. The
+server itself binds to ``0.0.0.0:8787`` by default, so it listens on every
+interface. For a local-only server, set ``SHRIMPLY_SERVER_HOST=127.0.0.1``
+before starting it. See :doc:`configuration` for bind, port, cache, and device
+settings.
+
+In Shrimply, open :menuselection:`Preferences --> External`. Select the local
+server under :guilabel:`Inference Servers`, then choose one of the compute
+devices reported by that server.
 
 The :guilabel:`Available` row shows the features supplied by the selected
 server. If a feature is missing, it will not appear in the corresponding
@@ -62,6 +68,13 @@ between runs.
    $ cd server
    $ docker compose up --build
 
+
+Configuration
+-------------
+
+See :doc:`configuration` for the server's environment variables, model cache
+locations, worker idle timeout, and device/offload controls.
+
 Compute features
 ----------------
 
@@ -87,6 +100,7 @@ downloads; later requests reuse the downloaded files.
    :hidden:
 
    services
+   configuration
    transcription
    text-to-speech
    video-segmentation
