@@ -65,6 +65,22 @@ single-file `dev.shrimply.Shrimply.flatpak` bundle. It's a long build
 `packaging/flatpak/README.md` for details, caching notes, and the manual
 step-by-step equivalent.
 
+### Install and run the Flatpak
+
+Install Flatpak on your host before using the bundle. The bundle expects GNOME
+Platform 50 (`org.gnome.Platform//50`); install that runtime from Flathub if
+your host does not already have it. From repository root, install bundle for
+current user, then launch application:
+
+```console
+flatpak --user install ./dev.shrimply.Shrimply.flatpak
+flatpak run dev.shrimply.Shrimply
+```
+
+`dev.shrimply.Shrimply` is application ID from
+`packaging/flatpak/dev.shrimply.Shrimply.yaml`. `--user` keeps installation
+available only to current user.
+
 ### Finding Things to Work On
 
 Browse the [open issues](https://github.com/soirihiroka/shrimply/issues) for
