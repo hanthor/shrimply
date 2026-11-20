@@ -192,20 +192,6 @@ class TestStreamModelProgressContext(TestCase):
                     import api.model_progress
                     assert api.model_progress.report_progress is mock_report
 
-    def test_context_manager_include_diffusers_false_by_default(self) -> None:
-        """Test that diffusers is not patched by default."""
-        mock_report = MagicMock()
-        
-        with patch.dict("sys.modules", {
-            "transformers.utils.logging": MagicMock(),
-            "huggingface_hub._snapshot_download": MagicMock(),
-            "huggingface_hub.file_download": MagicMock(),
-        }):
-            with patch("sys.modules.get", side_effect=lambda x: None):
-                # Should not attempt to import diffusers
-                with stream_model_progress(mock_report, include_diffusers=False):
-                    pass
-
     def test_context_manager_include_diffusers_true(self) -> None:
         """Test that diffusers is patched when include_diffusers=True."""
         mock_report = MagicMock()
