@@ -6484,6 +6484,7 @@ dependencies = [
  "shrimply-math-geometry",
  "shrimply-paint-interpolation",
  "shrimply-timeline-value",
+ "uuid",
 ]
 
 [[package]]
