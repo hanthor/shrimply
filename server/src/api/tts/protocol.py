@@ -287,16 +287,7 @@ class ErrorEvent(ProtocolModel):
     message: str
 
 
-class QueuedEvent(ProtocolModel):
-    kind: Literal["queued"] = "queued"
-    position: int = Field(ge=1)
-
-
 type WorkerEvent = Annotated[
     ProgressEvent | ResultEvent | ErrorEvent, Field(discriminator="kind")
-]
-type StreamEvent = Annotated[
-    QueuedEvent | ProgressEvent | ResultEvent | ErrorEvent,
-    Field(discriminator="kind"),
 ]
 WORKER_EVENT_VALIDATOR = TypeAdapter(WorkerEvent)
