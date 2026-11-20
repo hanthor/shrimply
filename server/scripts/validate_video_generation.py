@@ -157,7 +157,7 @@ def render(
     last_progress: str | None = None
     heartbeat.start()
     try:
-        with urllib.request.urlopen(http_request) as response, temporary.open("wb") as target:
+        with urllib.request.urlopen(http_request, timeout=REQUEST_TIMEOUT_SECONDS) as response, temporary.open("wb") as target:
             while header := response.read(8):
                 if len(header) != 8:
                     raise RuntimeError("truncated event header")
