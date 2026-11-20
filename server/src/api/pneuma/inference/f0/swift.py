@@ -24,10 +24,10 @@ if TYPE_CHECKING:
 SWIFT_F0_MODEL_ROOT = model_cache_dir("swift-f0")
 SWIFT_F0_MODEL_PATH = SWIFT_F0_MODEL_ROOT / "model.safetensors"
 SWIFT_F0_ONNX_URL = (
-    "https://github.com/lars76/swift-f0/raw/refs/heads/main/swift_f0/model.onnx"
+    "https://github.com/lars76/swift-f0/raw/d1ba77fe5331310b778ebe126b6cb3656d41d24f/swift_f0/model.onnx"
 )
 SWIFT_F0_ONNX_SHA256 = (
-    "3f8a4843b0213d8d6eb10f8ad22b3e8c95a5f10660635467448c9bf72382cfbb"
+    "6385e8c2ebc3872e82c9ff5946228de44cd3be77a750ea53698b7dbfe94b0a22"
 )
 
 
