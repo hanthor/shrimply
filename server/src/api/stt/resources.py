@@ -12,7 +12,7 @@ MODELS = {
 }
 
 
-def request(model_id: ModelId) -> ResourceProfile:
+def profile(model_id: ModelId) -> ResourceProfile:
     parameters, bytes_per_parameter, workspace = MODELS[model_id]
     return ResourceProfile(
         resident_vram=parameters * bytes_per_parameter,
