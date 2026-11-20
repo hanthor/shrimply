@@ -16,10 +16,8 @@ import env
 from pydantic import BaseModel
 
 from api import gpu
+from api.service import Service
 
-type Service = Literal[
-    "3dtracking", "pneuma", "sam2", "stt", "tts", "video_generation"
-]
 type WorkerState = Literal[
     "reserved", "loading", "ready", "running", "decoding", "streaming", "stopped"
 ]
