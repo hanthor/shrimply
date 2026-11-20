@@ -46,15 +46,16 @@ modules:
   # Rubber Band (meson-only since v3). Optional features disabled explicitly;
   # fft/resampler use the builtin implementation.
   #
-  # -Dlibdir=lib / -DCMAKE_INSTALL_LIBDIR=lib on every meson/cmake module below:
-  # org.gnome.Sdk//50 has a real /usr/lib64, so meson and CMake install
-  # libfoo.so + foo.pc under /app/lib64, which nothing searches -- flatpak's
-  # PKG_CONFIG_PATH and runtime linker path are /app/lib only. Without this,
-  # ffmpeg's ./configure fails with "libfdk_aac not found".
+  # Libraries must land in /app/lib: org.gnome.Sdk//50 has a real /usr/lib64,
+  # so meson and CMake would otherwise install libfoo.so + foo.pc under
+  # /app/lib64, which nothing searches (flatpak's PKG_CONFIG_PATH and runtime
+  # linker path are /app/lib only; ffmpeg's ./configure then fails with
+  # "libfdk_aac not found"). CMake modules below pass
+  # -DCMAKE_INSTALL_LIBDIR=lib. Meson modules need nothing: flatpak-builder
+  # already passes --libdir=lib, and current meson rejects a second -Dlibdir.
   - name: rubberband
     buildsystem: meson
     config-opts:
-      - -Dlibdir=lib
       - -Dfft=auto
       - -Dresampler=auto
       - -Djni=disabled
@@ -150,7 +151,6 @@ modules:
   - name: vte
     buildsystem: meson
     config-opts:
-      - -Dlibdir=lib  # see rubberband
       - -Dgtk3=false
       - -Dgtk4=true
       - -D_systemd=false
