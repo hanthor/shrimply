@@ -2,11 +2,16 @@ use shrimply_audio_modifiers::{
     AudioModifierEffect, CacheModifier, DenoiseEngine, PNEUMA_MAX_PITCH_OFFSET, PNEUMA_MAX_SPEED,
     PNEUMA_MIN_PITCH_OFFSET, PNEUMA_MIN_SPEED, ReverbMode,
 };
-use shrimply_core::{modifier_model::ModifierModel, timeline_value::TimelineValue};
+use shrimply_core::{
+    modifier_model::ModifierModel,
+    timeline_value::{Interpolation, TimelineBase, TimelineValue},
+};
 use shrimply_project::project::{AudioSource, ItemAddress, Project, Time};
 use shrimply_state::player_state::{self, SharedPlayerState};
 use std::sync::{Mutex, OnceLock};
 
+use crate::keyframe_graph::{GraphPoint, GraphSegment, KeyframeGraph, ScalarGraph};
+use crate::model::InspectorRuntime;
 use crate::{AudioModifierChoice, InspectorTarget};
 
 type VoiceModelCatalog = Vec<(String, Vec<String>)>;
@@ -703,4 +708,52 @@ pub(crate) fn audio_modifier_keyframe_time(
         .keyframe_timeline_time(address, time)
         .and_then(|timeline_time| project.keyframe_time(address, timeline_time))
         .ok_or_else(|| "the audio modifier keyframe time is no longer available".to_string())
+}
+
+/// The keyframe graph an audio-modifier scalar control presents, in display
+/// units via `AudioModifierScalarPresentation::display`.
+///
+/// `None` when the timeline holds a single static value, which is what the
+/// inspectors use to decide whether to draw a graph at all.
+pub fn scalar_graph(
+    timeline: &TimelineValue<f32>,
+    runtime: InspectorRuntime,
+    display: fn(f32) -> f64,
+) -> Option<ScalarGraph> {
+    if !matches!(timeline.base, TimelineBase::Keyframes(_)) {
+        return None;
+    }
+    let static_value = display(timeline.value_at(runtime.local_time.unwrap_or(Time::ZERO)));
+    let KeyframeGraph::RawValue {
+        points, segments, ..
+    } = crate::keyframe_model::scalar_graph(timeline, static_value, display)
+    else {
+        unreachable!("scalar timeline must produce a raw keyframe graph")
+    };
+    Some(ScalarGraph {
+        points: points
+            .into_iter()
+            .map(|point| GraphPoint {
+                time: point.time,
+                value: point.value,
+            })
+            .collect(),
+        segments: segments
+            .into_iter()
+            .map(|segment| GraphSegment {
+                owner_id: segment.owner_id,
+                start: segment.start,
+                end: segment.end,
+                start_value: segment.start_value,
+                end_value: segment.end_value,
+                interpolation: Interpolation::KEYFRAME
+                    .iter()
+                    .position(|candidate| *candidate == segment.interpolation)
+                    .expect("scalar keyframe interpolation must be available"),
+            })
+            .collect(),
+        range: runtime.keyframe_range.unwrap_or((Time::ZERO, Time::ZERO)),
+        frame_step: runtime.frame_step,
+        playhead: runtime.keyframe_playhead.unwrap_or(Time::ZERO),
+    })
 }
