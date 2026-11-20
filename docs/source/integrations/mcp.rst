@@ -84,6 +84,23 @@ MCP time values are zero-based integer frames. Use ``create_track``,
 ``delete_clips`` to edit it; and ``set_clip_properties`` or
 ``set_track_enabled`` to change validated properties.
 
+Track and rendering operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``get_track`` is a read-only query that returns one fully addressed track and up
+to 500 of its clips in projected timeline order. Use optional ``offset`` and
+``limit`` values for pagination.
+
+``analyze_transparent_fill`` accepts a fully addressed clip and modifier ID,
+then waits until the modifier's frame masks are cached. It returns the
+analysis generation and project revision.
+
+``set_caption_track_language`` sets or clears a caption track's CLDR locale
+identifier, such as ``en_US``, ``en_GB``, or ``ja_JP``.
+
+``delete_track`` removes a fully addressed caption, video, or audio track and
+all of its clips as one undoable edit. Treat it as destructive.
+
 ``set_video_transform`` sets constant position, scale, rotation, anchor,
 shear, fit mode, and raster crop values. A supplied transform field replaces
 that field's existing keyframes. Fit modes are ``natural``, ``contain``,
