@@ -23,13 +23,14 @@ with:
 Bind and access
 ---------------
 
-The editor defaults to ``http://127.0.0.1:8787`` when connecting. The server
-itself defaults to ``0.0.0.0:8787``, which listens on every interface. Use a
-loopback bind when the server must remain local:
+The editor defaults to ``http://127.0.0.1:8787`` when connecting, and the
+server binds to ``127.0.0.1:8787`` by default, so it is reachable only from
+the same machine. To serve the editor on another machine, bind every
+interface instead:
 
 .. code-block:: console
 
-   $ SHRIMPLY_SERVER_HOST=127.0.0.1 uv run --locked src/main.py
+   $ SHRIMPLY_SERVER_HOST=0.0.0.0 uv run --locked src/main.py
 
 ``SHRIMPLY_SERVER_SHARE=1`` additionally requests a temporary public
 ``gradio.live`` URL. The URL can invoke every compute endpoint. Do not enable
@@ -37,8 +38,8 @@ sharing on an untrusted network or treat it as authentication; stop the
 server to remove the temporary URL.
 
 ``SHRIMPLY_SERVER_HOST``
-   Address passed to the server listener. Default: ``0.0.0.0``. Set
-   ``127.0.0.1`` for local-only access.
+   Address passed to the server listener. Default: ``127.0.0.1``. Set
+   ``0.0.0.0`` to accept connections from other machines.
 
 ``SHRIMPLY_SERVER_PORT``
    Listener port. Default: ``8787``. The value must parse as a positive

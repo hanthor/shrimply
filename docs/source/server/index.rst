@@ -30,10 +30,9 @@ starting a large download.
 Connect Shrimply
 ----------------
 
-The editor uses ``http://127.0.0.1:8787`` as its default connection URL. The
-server itself binds to ``0.0.0.0:8787`` by default, so it listens on every
-interface. For a local-only server, set ``SHRIMPLY_SERVER_HOST=127.0.0.1``
-before starting it. See :doc:`configuration` for bind, port, cache, and device
+The editor uses ``http://127.0.0.1:8787`` as its default connection URL, and
+the server binds to ``127.0.0.1:8787`` by default. To reach it from another
+machine, set ``SHRIMPLY_SERVER_HOST=0.0.0.0`` before starting it. See :doc:`configuration` for bind, port, cache, and device
 settings.
 
 In Shrimply, open :menuselection:`Preferences --> External`. Select the local
