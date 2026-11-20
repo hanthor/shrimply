@@ -33,3 +33,19 @@ coloration.
 3D scene content can include shapes, text, imported objects, a ground plane,
 point lights, and sun lights. Imported OBJ, GLB, and PLY content can be used in
 the same scene pipeline.
+
+3D rendering
+------------
+
+PBR scenes expose a **Denoiser** control in the inspector. It is enabled by
+default and applies only to the PBR shading model; Toon and Depth scenes do not
+use it.
+
+The backend depends on the platform:
+
+* NVIDIA/CUDA rendering uses the OptiX 9 AOV denoiser. Local development builds
+  need the CUDA toolkit and the repository's ``external/optix-dev`` checkout;
+  see :doc:`Development <../development>` for build prerequisites.
+* macOS Metal rendering uses SVGF denoising. It cannot be combined with
+  stochastic depth of field. Turn **Denoiser** off or set the camera's focus
+  distance to ``0`` when that combination is needed.

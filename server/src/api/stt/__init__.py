@@ -89,7 +89,7 @@ def transcribe(
     send_event: Callable[[WorkerEvent | resource.QueuedEvent], None],
 ) -> None:
     key = resource.WorkerKey("stt", model_id)
-    profile = stt_resources.request(model_id)
+    profile = stt_resources.profile(model_id)
     lease = resource.scheduler.acquire(
         job,
         key,

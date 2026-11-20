@@ -16,7 +16,7 @@ from huggingface_hub import snapshot_download
 from huggingface_hub.constants import HF_HUB_CACHE
 
 from api.model_progress import StreamedModelProgress, stream_model_progress
-from api.tts.errors import log_failure, public_error_message
+from api.errors import log_failure, public_error_message
 from api.tts.index_tts_2_0.audio_features import decode_audio
 from api.tts.index_tts_2_0.inference import synthesize as synthesize_index
 from api.tts.index_tts_2_0.model_loader import (

@@ -15,7 +15,7 @@ def _path(name: str, default: Path) -> Path:
 
 
 SERVER_GIT_HASH = os.environ.get("SHRIMPLY_SERVER_GIT_HASH", "").strip()
-SERVER_HOST = os.environ.get("SHRIMPLY_SERVER_HOST", "0.0.0.0")
+SERVER_HOST = os.environ.get("SHRIMPLY_SERVER_HOST", "127.0.0.1")
 SERVER_PORT = _positive_int("SHRIMPLY_SERVER_PORT", 8787)
 _server_share_value = os.environ.get("SHRIMPLY_SERVER_SHARE", "0")
 if _server_share_value not in {"0", "1"}:

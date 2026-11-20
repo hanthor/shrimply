@@ -59,7 +59,7 @@ MODELS = {
 }
 
 
-def request(
+def profile(
     model_id: ModelId,
     precision: Precision,
     cuda: bool,
