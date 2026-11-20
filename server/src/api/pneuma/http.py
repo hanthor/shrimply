@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from api import log_request, request_content_type, resource, respond_error, stream_events
 from api import pneuma
 from api.pneuma.protocol import CONVERSION_REQUEST_VALIDATOR, ErrorEvent
-from api.tts.errors import log_failure, public_error_message
+from api.errors import log_failure, public_error_message
 
 logger = logging.getLogger("shrimply.server")
 MAXIMUM_REQUEST_BYTES = 65 * 1024 * 1024
