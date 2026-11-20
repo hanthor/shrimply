@@ -36,10 +36,19 @@ part of `make check` / `make dev`.
   caches `crates/render-cuda/prebuilt` (keyed on the shader sources, `build.rs`
   and the Dockerfile); on a cache miss the Docker rebuild runs as on a fresh
   clone.
+- The CUDA toolkit is **pinned** in the Dockerfile, as
+  `ARG CUDA_TOOLKIT_VERSION` (currently `13-4`) — not bare `cuda-toolkit`,
+  which is a rolling metapackage. The pin is what keeps a shipped bundle
+  reproducible: this nvcc's output is vendored and goes straight into the
+  flatpak. Because the version lives in the Dockerfile text, bumping it also
+  moves the `cuda-cubins` cache key, so vendored cubins can't outlive the
+  compiler that produced them. **When you bump it, delete
+  `crates/render-cuda/prebuilt/`** — a local tree that still has cubins will
+  skip nvcc and keep serving the old ones.
 - `build.rs`'s existence check is unconditional, so a plain host `make
   cuda-artifacts` also reuses whatever's vendored. **After editing a `.slang`
   shader, delete the corresponding `prebuilt/sm_86/<module>.cubin`** or nvcc
   never re-runs and you get stale output.
-- `build.rs` always passes `nvcc -allow-unsupported-compiler` (CUDA 13.3
+- `build.rs` always passes `nvcc -allow-unsupported-compiler` (CUDA 13.x
   refuses GCC >15 otherwise); the Dockerfile's `CMD` sets `CUDA_HOST_CXX=g++`
   because the Makefile default `g++-15` isn't installed on Fedora 44.
