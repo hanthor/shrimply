@@ -6943,6 +6943,7 @@ dependencies = [
  "glam 0.33.5",
  "nalgebra",
  "num-traits",
+ "serde",
  "serde_json",
  "shrimply-cuda",
  "shrimply-math-color",
