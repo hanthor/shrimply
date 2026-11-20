@@ -19,6 +19,7 @@ use video::compositor::{
 };
 
 pub use shrimply_preview_interaction_core::captions;
+#[cfg(feature = "cuda")]
 mod cuda_gl;
 pub use shrimply_preview_interaction_core::{geometry, guides};
 mod media;
