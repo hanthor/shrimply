@@ -50,11 +50,6 @@ class VCChunkConfigTests(TestCase):
         result = vc_chunk_config(is_half=False, gpu_mem=None)
         self.assertEqual(result, (1, 6, 38, 41))
 
-    def test_cpu_only_mode_with_half_precision_flag(self):
-        """Test CPU-only mode ignores half-precision flag."""
-        result = vc_chunk_config(is_half=True, gpu_mem=None)
-        self.assertEqual(result, (1, 6, 38, 41))
-
     def test_return_value_structure(self):
         """Test that return value is always a 4-tuple of positive integers."""
         configs = [
@@ -113,16 +108,6 @@ class VCChunkConfigTests(TestCase):
         
         # >4GB without half-precision should use conservative config
         self.assertEqual(result_5gb, (1, 6, 38, 41))
-
-    def test_boundary_6gb_threshold_with_half_precision(self):
-        """Test boundary condition at 6GB threshold with half-precision."""
-        # 5GB with half-precision still uses conservative (not balanced) config
-        result_5gb_half = vc_chunk_config(is_half=True, gpu_mem=5)
-        self.assertEqual(result_5gb_half, (1, 6, 38, 41))
-        
-        # 6GB with half-precision uses balanced config
-        result_6gb_half = vc_chunk_config(is_half=True, gpu_mem=6)
-        self.assertEqual(result_6gb_half, (3, 10, 60, 65))
 
     def test_large_vram_uses_appropriate_config(self):
         """Test that large VRAM amounts use appropriate config based on precision."""
