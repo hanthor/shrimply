@@ -1,7 +1,8 @@
 from fractions import Fraction
+from importlib.util import find_spec
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from unittest.mock import MagicMock, patch
 
 import torch
@@ -126,6 +127,7 @@ class VideoGenerationChecks(TestCase):
                 torch.equal(restored["condition_latents"][0], values["condition_latents"][0])
             )
 
+    @skipUnless(find_spec("diffusers"), "generate() imports diffusers, not installed")
     def test_generation_translates_and_saves_latents(self) -> None:
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
