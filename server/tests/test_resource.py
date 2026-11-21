@@ -344,17 +344,16 @@ class TestSchedulerCapacityMath(TestCase):
             assert self.scheduler._possible_locked(profile) is True
 
     def test_possible_locked_checks_vram_on_cuda_device(self):
-        _fake_gpu.device = "cuda:0"
-        _fake_gpu.total_vram = MagicMock(return_value=100)
-        try:
-            with patch("os.process_cpu_count", return_value=4), \
-                 patch.object(resource, "total_memory_limit", return_value=None):
-                fits = ResourceProfile(resident_vram=50, active_vram=50, cpu_slots=1)
-                exceeds = ResourceProfile(resident_vram=60, active_vram=60, cpu_slots=1)
-                assert self.scheduler._possible_locked(fits) is True
-                assert self.scheduler._possible_locked(exceeds) is False
-        finally:
-            _fake_gpu.device = "cpu"
+        # Patch resource.gpu, not _fake_gpu: when another test module imported
+        # the real api.gpu first, the sys.modules stub above is never used.
+        with patch.object(resource.gpu, "device", "cuda:0"), \
+             patch.object(resource.gpu, "total_vram", return_value=100), \
+             patch("os.process_cpu_count", return_value=4), \
+             patch.object(resource, "total_memory_limit", return_value=None):
+            fits = ResourceProfile(resident_vram=50, active_vram=50, cpu_slots=1)
+            exceeds = ResourceProfile(resident_vram=60, active_vram=60, cpu_slots=1)
+            assert self.scheduler._possible_locked(fits) is True
+            assert self.scheduler._possible_locked(exceeds) is False
 
     def test_fits_delta_locked_rejects_over_cpu_capacity(self):
         self.scheduler._cpu_slots = 2
@@ -416,17 +415,16 @@ class TestSchedulerSelectDevice(TestCase):
             self.scheduler.select_device("cpu")
 
     def test_select_device_to_the_same_device_is_a_noop(self):
-        _fake_gpu.device = "cpu"
-        self.scheduler.select_device("cpu")
-        assert _fake_gpu.device == "cpu"
+        with patch.object(resource.gpu, "device", "cpu"):
+            self.scheduler.select_device("cpu")
+            assert resource.gpu.device == "cpu"
 
     def test_select_device_switches_when_idle(self):
-        _fake_gpu.device = "cpu"
-        try:
+        # patch.object restores the original device even though select_device
+        # assigns gpu.device directly.
+        with patch.object(resource.gpu, "device", "cpu"):
             self.scheduler.select_device("cuda:0")
-            assert _fake_gpu.device == "cuda:0"
-        finally:
-            _fake_gpu.device = "cpu"
+            assert resource.gpu.device == "cuda:0"
 
 
 class TestSchedulerSummaryAndShutdown(TestCase):
