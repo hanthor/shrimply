@@ -44,6 +44,80 @@ Build the documentation on its own with:
 
    $ make docs
 
+macOS (AppKit and Metal)
+------------------------
+
+macOS uses the AppKit launcher and editor with Metal rendering instead of the
+GTK and CUDA build. ``make dev``, ``make build``, ``make check`` and
+``make test`` depend on the CUDA artifacts, and ``make cuda-artifacts`` refuses
+to run anywhere but Linux, so on macOS use only the ``dev-mac`` and
+``appkit-*`` targets below. ``make deps-fedora`` does not apply.
+
+Requirements:
+
+* A Mac with a Metal-capable GPU. ``crates/render-metal/build.rs`` compiles
+  every shader module on the system Metal device while building and panics
+  with ``Metal compiler device unavailable`` if there is none, which rules out
+  most virtual machines.
+* Xcode Command Line Tools, for the C and C++ compilers and linker:
+  ``xcode-select --install``.
+* `Homebrew <https://brew.sh>`__ and these formulae:
+
+  .. code-block:: console
+
+     $ brew install llvm@18 pkgconf cmake ninja librsvg ffmpeg opencv
+
+  The Makefile's ``APPKIT_BUILD_ENV`` finds ``llvm@18`` and ``pkgconf`` with
+  ``brew --prefix``: ``llvm@18`` supplies ``CLANG_PATH`` and ``LIBCLANG_PATH``
+  for the crates that generate bindings at build time, and ``pkgconf`` is the
+  ``pkg-config`` they use to find ``ffmpeg`` and ``opencv``. ``cmake`` and
+  ``ninja`` build the Slang compiler library, and ``librsvg`` provides the
+  ``rsvg-convert`` that renders ``assets/icons/dev.shrimply.Shrimply-macos.svg``
+  to the PNG icon.
+* ``rustup``, with the nightly toolchain pinned in ``rust-toolchain.toml``.
+  Install ``rustup`` from `rustup.rs <https://rustup.rs>`__, then run this in
+  the repository root so it reads the pinned toolchain:
+
+  .. code-block:: console
+
+     $ rustup show active-toolchain || rustup toolchain install
+
+* The Slang submodule, including its nested submodules:
+
+  .. code-block:: console
+
+     $ git submodule update --init --recursive external/slang
+
+  The first build compiles Slang with CMake and Ninja into
+  ``external/slang/build``, which takes a while. Later builds reuse it.
+
+Then build and run from the repository root:
+
+.. code-block:: console
+
+   $ make dev-mac
+
+``make dev-mac`` builds ``shrimply-appkit`` and ``shrimply-editor-appkit`` and
+runs ``target/debug/shrimply-appkit`` with the default ``RUST_LOG``. Unlike
+``make dev`` it does not write ``target/shrimply-dev.log``. These targets are
+also available:
+
+``make appkit-build``
+   Debug build of the launcher and editor without running them.
+
+``make appkit-check``
+   Builds, then runs ``cargo check`` and Clippy with ``-D warnings`` on the
+   AppKit, Metal and framegraph crates. Run it before submitting AppKit
+   changes, in place of ``make check``.
+
+``make appkit-lint``
+   Only the Clippy step of ``make appkit-check``.
+
+``make appkit-components-check`` and ``make appkit-components-showcase``
+   Check, or run, the AppKit component library and its demo app.
+
+Every ``appkit-*`` target exits with an error on a non-macOS host.
+
 
 Docker Build Environment [Experimental]
 ---------------------------------------
