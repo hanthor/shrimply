@@ -47,6 +47,28 @@ def respond_error(status: HTTPStatus, code: str, message: str) -> Response:
     return respond(status, ErrorResponse(error=ApiError(code=code, message=message)))
 
 
+def validate_content_length(
+    request: Request, maximum: int, range_message: str
+) -> int | Response:
+    """Return the declared Content-Length, or the error response to send.
+
+    A missing or unparseable header is 411; a value outside 1..maximum is 400.
+    """
+    try:
+        content_length = int(request.headers.get("content-length", ""))
+    except ValueError:
+        return respond_error(
+            HTTPStatus.LENGTH_REQUIRED,
+            "content_length_required",
+            "A valid Content-Length header is required",
+        )
+    if content_length <= 0 or content_length > maximum:
+        return respond_error(
+            HTTPStatus.BAD_REQUEST, "invalid_content_length", range_message
+        )
+    return content_length
+
+
 def request_content_type(request: Request) -> str:
     return request.headers.get("content-type", "").partition(";")[0].strip().lower()
 

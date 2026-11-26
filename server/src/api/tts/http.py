@@ -7,7 +7,14 @@ from fastapi import Request
 from fastapi.responses import Response
 from pydantic import ValidationError
 
-from api import log_request, request_content_type, resource, respond_error, stream_events
+from api import (
+    log_request,
+    request_content_type,
+    resource,
+    respond_error,
+    stream_events,
+    validate_content_length,
+)
 from api import tts
 from api.errors import log_failure, public_error_message
 from api.tts.protocol import ErrorEvent, SYNTHESIS_REQUEST_VALIDATOR
@@ -34,22 +41,14 @@ async def handle_request(request: Request) -> Response:
             "unsupported_media_type",
             "Expected application/msgpack",
         )
-    try:
-        content_length = int(request.headers.get("content-length", ""))
-    except ValueError:
+    content_length = validate_content_length(
+        request,
+        MAXIMUM_REQUEST_BYTES,
+        "Speech request must be between 1 byte and 65 MiB",
+    )
+    if isinstance(content_length, Response):
         resource.finish_job(job)
-        return respond_error(
-            HTTPStatus.LENGTH_REQUIRED,
-            "content_length_required",
-            "A valid Content-Length header is required",
-        )
-    if content_length <= 0 or content_length > MAXIMUM_REQUEST_BYTES:
-        resource.finish_job(job)
-        return respond_error(
-            HTTPStatus.BAD_REQUEST,
-            "invalid_content_length",
-            "Speech request must be between 1 byte and 65 MiB",
-        )
+        return content_length
     try:
         received = bytearray()
         async for chunk in request.stream():
