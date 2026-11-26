@@ -7,7 +7,14 @@ from fastapi import Request
 from fastapi.responses import Response
 from pydantic import ValidationError
 
-from api import log_request, request_content_type, resource, respond_error, stream_events
+from api import (
+    log_request,
+    request_content_type,
+    resource,
+    respond_error,
+    stream_events,
+    validate_content_length,
+)
 from api import stt
 from api.stt.protocol import MODEL_ID_VALIDATOR, ErrorEvent
 from api.stt.resources import MAXIMUM_AUDIO_BYTES
@@ -49,22 +56,14 @@ async def handle_request(request: Request) -> Response:
             "unsupported_media_type",
             "Expected application/octet-stream",
         )
-    try:
-        content_length = int(request.headers.get("content-length", ""))
-    except ValueError:
+    content_length = validate_content_length(
+        request,
+        MAXIMUM_AUDIO_BYTES,
+        "Audio request must be between 1 byte and 512 MiB",
+    )
+    if isinstance(content_length, Response):
         resource.finish_job(job)
-        return respond_error(
-            HTTPStatus.LENGTH_REQUIRED,
-            "content_length_required",
-            "A valid Content-Length header is required",
-        )
-    if content_length <= 0 or content_length > MAXIMUM_AUDIO_BYTES:
-        resource.finish_job(job)
-        return respond_error(
-            HTTPStatus.BAD_REQUEST,
-            "invalid_content_length",
-            "Audio request must be between 1 byte and 512 MiB",
-        )
+        return content_length
     path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(prefix="shrimply-stt-", delete=False) as audio:

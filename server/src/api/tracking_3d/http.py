@@ -9,7 +9,13 @@ from fastapi import Request
 from fastapi.responses import Response
 from pydantic import ValidationError
 
-from api import log_request, request_content_type, respond_error, stream_events
+from api import (
+    log_request,
+    request_content_type,
+    respond_error,
+    stream_events,
+    validate_content_length,
+)
 from api import resource, tracking_3d
 from api.tracking_3d.protocol import (
     ANALYSIS_REQUEST_VALIDATOR,
@@ -81,18 +87,13 @@ async def handle_request(request: Request) -> Response:
                 f"Expected {CONTENT_TYPE}",
             )
         )
-    try:
-        content_length = int(request.headers.get("content-length", ""))
-    except ValueError:
-        content_length = 0
-    if content_length <= 0 or content_length > MAXIMUM_ARCHIVE_BYTES:
-        return reject(
-            respond_error(
-                HTTPStatus.BAD_REQUEST,
-                "invalid_content_length",
-                "3D tracking request must be between 1 byte and 8 GiB",
-            )
-        )
+    content_length = validate_content_length(
+        request,
+        MAXIMUM_ARCHIVE_BYTES,
+        "3D tracking request must be between 1 byte and 8 GiB",
+    )
+    if isinstance(content_length, Response):
+        return reject(content_length)
     try:
         resource.scheduler.reserve_temporary(job, content_length * 2)
     except resource.TemporaryStorageUnavailable as exception:

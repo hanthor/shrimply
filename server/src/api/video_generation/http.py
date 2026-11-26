@@ -7,7 +7,14 @@ from fastapi import Request
 from fastapi.responses import Response
 from pydantic import ValidationError
 
-from api import gpu, log_request, request_content_type, respond_error, stream_events
+from api import (
+    gpu,
+    log_request,
+    request_content_type,
+    respond_error,
+    stream_events,
+    validate_content_length,
+)
 from api import resource
 from api.errors import log_failure, public_error_message
 from api.video_generation import generate
@@ -41,24 +48,13 @@ async def handle_request(request: Request) -> Response:
                 "Expected application/msgpack",
             )
         )
-    try:
-        content_length = int(request.headers.get("content-length", ""))
-    except ValueError:
-        return reject(
-            respond_error(
-                HTTPStatus.LENGTH_REQUIRED,
-                "content_length_required",
-                "A valid Content-Length header is required",
-            )
-        )
-    if content_length <= 0 or content_length > MAXIMUM_REQUEST_BYTES:
-        return reject(
-            respond_error(
-                HTTPStatus.BAD_REQUEST,
-                "invalid_content_length",
-                "Video-generation request must be between 1 byte and 513 MiB",
-            )
-        )
+    content_length = validate_content_length(
+        request,
+        MAXIMUM_REQUEST_BYTES,
+        "Video-generation request must be between 1 byte and 513 MiB",
+    )
+    if isinstance(content_length, Response):
+        return reject(content_length)
     if not gpu.device.startswith("cuda:"):
         return reject(
             respond_error(
